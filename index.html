@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>Field Graph</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="app">
+  <header class="header">
+    <div class="brand">FIELD GRAPH</div>
+    <div class="meta">
+      fields 1008
+      · simulated 1013
+      · clusters 76
+    </div>
+  </header>
+
+  <aside class="sidebar">
+    <div class="section">
+      <div class="section-title">OVERVIEW</div>
+      <div class="stat-row"><span>fields</span><span class="num">1008</span></div>
+      <div class="stat-row"><span>simulated</span><span class="num">1013</span></div>
+      <div class="stat-row"><span>clusters</span><span class="num">76</span></div>
+      <div class="stat-row"><span>noise</span><span class="num">402</span></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">VIEW</div>
+      <ul class="view-list">
+        <li data-view="graph"><span class="view-id">01</span>GRAPH</li>
+        <li data-view="map"><span class="view-id">02</span>MAP</li>
+        <li data-view="heatmap"><span class="view-id">03</span>HEATMAP</li>
+        <li data-view="groups"><span class="view-id">04</span>GROUPS</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <div class="section-title">SEARCH</div>
+      <input id="search-input" class="search-input" placeholder="field / dataset / subcategory..." autocomplete="off">
+      <div id="search-results" class="search-results"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">CATEGORIES</div>
+      <ul class="category-list">
+        <li><span>Fundamental</span><span class="count">492</span></li>
+<li><span>Analyst</span><span class="count">210</span></li>
+<li><span>News</span><span class="count">135</span></li>
+<li><span>Option</span><span class="count">92</span></li>
+<li><span>Price Volume</span><span class="count">38</span></li>
+<li><span>Model</span><span class="count">29</span></li>
+<li><span>Social Media</span><span class="count">12</span></li>
+      </ul>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div id="view-container" class="view-container">
+      <div class="empty-state"><div class="dot"></div><span>loading...</span></div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    generated · pnl_weight=0.85
+    · text_weight=0.15000000000000002
+    · demean=True
+    · HDBSCAN
+  </footer>
+</div>
+<script src="assets/main.js"></script>
+</body>
+</html>

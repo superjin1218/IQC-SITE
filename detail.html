@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>Field Detail</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="detail-app">
+  <div class="detail-header">
+    <a class="detail-back" href="index.html">← back to graph</a>
+    <h1 id="detail-title" class="detail-title">...</h1>
+    <div id="detail-meta" class="detail-meta"></div>
+  </div>
+
+  <div class="detail-controls">
+    <input id="detail-filter" class="filter-input" placeholder="filter by field / category / subcategory..." autocomplete="off">
+    <span id="detail-count" class="count-note">loading...</span>
+  </div>
+
+  <div id="detail-loading" class="detail-loading">loading neighbors...</div>
+  <div id="detail-error" class="detail-error" style="display:none"></div>
+
+  <table id="detail-table" class="neighbors" style="display:none">
+    <thead id="detail-table-head"></thead>
+    <tbody id="detail-table-body"></tbody>
+  </table>
+</div>
+<script src="assets/detail.js"></script>
+</body>
+</html>
