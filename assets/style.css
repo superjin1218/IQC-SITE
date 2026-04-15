@@ -480,6 +480,97 @@ table.neighbors tbody td .cat {
   background: var(--bg-hover);
   border-color: var(--accent);
 }
+.groups-slider {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  padding: 16px 20px 14px 20px;
+  margin-bottom: 12px;
+}
+.groups-slider .slider-top {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.groups-slider .slider-label {
+  color: var(--text-mute);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.groups-slider .slider-value {
+  color: var(--accent);
+  font-size: 26px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  min-width: 70px;
+}
+.groups-slider .slider-count {
+  margin-left: auto;
+  color: var(--text-mute);
+  font-size: 11px;
+}
+.groups-slider .slider-count b {
+  color: var(--text-hi);
+  font-weight: 500;
+  margin-right: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.groups-slider .slider-range {
+  width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  height: 24px;
+  cursor: pointer;
+  display: block;
+}
+.groups-slider .slider-range::-webkit-slider-runnable-track {
+  height: 4px;
+  background: linear-gradient(to right, var(--text-mute), var(--accent));
+  border-radius: 2px;
+}
+.groups-slider .slider-range::-moz-range-track {
+  height: 4px;
+  background: linear-gradient(to right, var(--text-mute), var(--accent));
+  border-radius: 2px;
+  border: none;
+}
+.groups-slider .slider-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--text-hi);
+  border: 2px solid var(--accent);
+  margin-top: -7px;
+  cursor: grab;
+  box-shadow: 0 0 0 3px rgba(107, 209, 255, 0.15);
+  transition: transform 0.1s;
+}
+.groups-slider .slider-range:active::-webkit-slider-thumb {
+  cursor: grabbing;
+  transform: scale(1.15);
+}
+.groups-slider .slider-range::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--text-hi);
+  border: 2px solid var(--accent);
+  cursor: grab;
+  box-shadow: 0 0 0 3px rgba(107, 209, 255, 0.15);
+}
+.groups-slider .slider-ticks {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  color: var(--text-mute);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+}
+
 .groups-tabs {
   display: flex;
   gap: 8px;
