@@ -78,6 +78,8 @@
   let filterQ = '';
   let sortKey = 'fitness';
   let sortDir = -1;
+  const BASE_DATA_URL = 'assets/data.json';
+  const META_JSONL_URL = 'https://raw.githubusercontent.com/superjin1218/IQCRAG/main/data/single_field_meta.jsonl';
 
   function fmtNumber(decimals) {
     return function(v) {
@@ -238,16 +240,30 @@
     downloadCsv('field_catalog_all.csv', rows.slice());
   });
 
-  fetch('assets/fields_catalog.json')
-    .then(function(response) {
-      if (!response.ok) throw new Error('HTTP ' + response.status);
+  Promise.all([
+    fetch(BASE_DATA_URL).then(function(response) {
+      if (!response.ok) throw new Error('base data HTTP ' + response.status);
       return response.json();
-    })
-    .then(function(data) {
-      rows = (data.fields || []).map(function(row) {
+    }),
+    fetch(META_JSONL_URL).then(function(response) {
+      if (!response.ok) throw new Error('meta data HTTP ' + response.status);
+      return response.text();
+    }),
+  ])
+    .then(function(results) {
+      const baseData = results[0];
+      const metaRows = parseJsonl(results[1]);
+      const metaByField = {};
+
+      metaRows.forEach(function(row) {
+        if (row && row.field_id) metaByField[row.field_id] = row;
+      });
+
+      rows = (baseData.fields || []).map(function(row) {
+        const meta = metaByField[row.field_id] || {};
         return {
           field_id: row.field_id,
-          expr: row.expr || '',
+          expr: meta.expr || '',
           sharpe: toNumber(row.sharpe),
           fitness: toNumber(row.fitness),
           turnover: toNumber(row.turnover),
@@ -255,16 +271,16 @@
           category: row.category || '',
           subcategory: row.subcategory || '',
           dataset: row.dataset || '',
-          status: row.status || '',
-          alpha_id: row.alpha_id || '',
-          returns: toNumber(row.returns),
-          drawdown: toNumber(row.drawdown),
+          status: meta.status || row.status || '',
+          alpha_id: meta.alpha_id || '',
+          returns: toNumber(meta.returns),
+          drawdown: toNumber(meta.drawdown),
         };
       });
 
       const metaParts = [
-        ['fields', data.n_fields_total || rows.length],
-        ['simulated', data.n_fields_simulated || rows.length],
+        ['fields', baseData.n_fields_total || rows.length],
+        ['simulated', baseData.n_fields_simulated || rows.length],
         ['sortable metrics', 'sharpe / fitness / turnover'],
         ['csv', 'current + all'],
       ];
@@ -296,5 +312,19 @@
   function toNumber(value) {
     const num = Number(value);
     return Number.isFinite(num) ? num : null;
+  }
+
+  function parseJsonl(text) {
+    return text
+      .split(/\r?\n/)
+      .filter(function(line) { return line.trim(); })
+      .map(function(line) {
+        try {
+          return JSON.parse(line);
+        } catch (error) {
+          return null;
+        }
+      })
+      .filter(Boolean);
   }
 })();
