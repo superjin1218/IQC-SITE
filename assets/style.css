@@ -224,6 +224,27 @@ a:hover { color: var(--text-hi); }
   font-variant-numeric: tabular-nums;
 }
 
+.page-links {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.page-link {
+  display: block;
+  padding: 8px 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  color: var(--text-bright);
+  transition: all 0.15s ease;
+}
+
+.page-link:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+  color: var(--text-hi);
+}
+
 /* main view container ----------------------------- */
 .view-container {
   position: absolute;
@@ -413,6 +434,114 @@ table.neighbors tbody td .cat {
   color: var(--text-mute);
 }
 .detail-error { color: var(--neg); }
+
+/* ================================================= */
+/*  fields.html                                      */
+/* ================================================= */
+.catalog-app {
+  min-height: 100vh;
+  padding: 32px 48px 64px 48px;
+  max-width: 1680px;
+  margin: 0 auto;
+}
+
+.catalog-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.catalog-controls .filter-input {
+  flex: 1 1 320px;
+  min-width: 240px;
+  background: var(--bg-surface);
+  color: var(--text-bright);
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  font-family: inherit;
+  font-size: 12px;
+  outline: none;
+}
+
+.catalog-controls .filter-input:focus {
+  border-color: var(--text-hi);
+}
+
+.catalog-btn {
+  background: var(--bg-surface);
+  color: var(--accent);
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.catalog-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+}
+
+.catalog-table-wrap {
+  border: 1px solid var(--border);
+  overflow: auto;
+  background: var(--bg-primary);
+}
+
+table.catalog-table {
+  min-width: 1480px;
+}
+
+table.catalog-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-primary);
+  z-index: 1;
+}
+
+table.catalog-table tbody td.expr {
+  max-width: 520px;
+  min-width: 360px;
+}
+
+.catalog-expr {
+  display: block;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-bright);
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.catalog-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.catalog-mini-btn {
+  color: var(--accent);
+  border: 1px solid var(--border);
+  background: transparent;
+  padding: 2px 6px;
+  font-family: inherit;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.catalog-mini-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+}
+
+table.catalog-table tbody td.actions {
+  min-width: 130px;
+}
 
 /* ================================================= */
 /*  GROUPS panel                                     */
