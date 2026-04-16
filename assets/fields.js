@@ -79,7 +79,20 @@
   let sortKey = 'fitness';
   let sortDir = -1;
   const BASE_DATA_URL = 'assets/data.json';
-  const META_JSONL_URL = 'https://raw.githubusercontent.com/superjin1218/IQCRAG/main/data/single_field_meta.jsonl';
+  const VEC_AVG_FIELDS = new Set([
+    'snt_buzz_bfl',
+    'snt_buzz_bfl_fast_d1',
+    'snt_buzz_fast_d1',
+    'snt_buzz_ret',
+    'snt_buzz_ret_fast_d1',
+    'snt_social_value',
+    'snt_social_volume',
+    'snt_value',
+    'snt_value_fast_d1',
+    'scl12_sentiment',
+    'scl12_sentiment_fast_d1',
+    'scl12_buzz_fast_d1',
+  ]);
 
   function fmtNumber(decimals) {
     return function(v) {
@@ -121,7 +134,6 @@
             row.subcategory,
             row.dataset,
             row.status,
-            row.alpha_id,
           ].join(' ').toLowerCase();
           return haystack.includes(filterQ);
         })
@@ -203,9 +215,6 @@
       'subcategory',
       'dataset',
       'status',
-      'alpha_id',
-      'returns',
-      'drawdown',
     ];
     const lines = [columns.join(',')];
     sourceRows.forEach(function(row) {
@@ -240,30 +249,16 @@
     downloadCsv('field_catalog_all.csv', rows.slice());
   });
 
-  Promise.all([
-    fetch(BASE_DATA_URL).then(function(response) {
+  fetch(BASE_DATA_URL)
+    .then(function(response) {
       if (!response.ok) throw new Error('base data HTTP ' + response.status);
       return response.json();
-    }),
-    fetch(META_JSONL_URL).then(function(response) {
-      if (!response.ok) throw new Error('meta data HTTP ' + response.status);
-      return response.text();
-    }),
-  ])
-    .then(function(results) {
-      const baseData = results[0];
-      const metaRows = parseJsonl(results[1]);
-      const metaByField = {};
-
-      metaRows.forEach(function(row) {
-        if (row && row.field_id) metaByField[row.field_id] = row;
-      });
-
+    })
+    .then(function(baseData) {
       rows = (baseData.fields || []).map(function(row) {
-        const meta = metaByField[row.field_id] || {};
         return {
           field_id: row.field_id,
-          expr: meta.expr || '',
+          expr: buildExpr(row.field_id),
           sharpe: toNumber(row.sharpe),
           fitness: toNumber(row.fitness),
           turnover: toNumber(row.turnover),
@@ -271,10 +266,7 @@
           category: row.category || '',
           subcategory: row.subcategory || '',
           dataset: row.dataset || '',
-          status: meta.status || row.status || '',
-          alpha_id: meta.alpha_id || '',
-          returns: toNumber(meta.returns),
-          drawdown: toNumber(meta.drawdown),
+          status: row.status || '',
         };
       });
 
@@ -314,17 +306,8 @@
     return Number.isFinite(num) ? num : null;
   }
 
-  function parseJsonl(text) {
-    return text
-      .split(/\r?\n/)
-      .filter(function(line) { return line.trim(); })
-      .map(function(line) {
-        try {
-          return JSON.parse(line);
-        } catch (error) {
-          return null;
-        }
-      })
-      .filter(Boolean);
+  function buildExpr(fieldId) {
+    const inner = 'ts_backfill(' + fieldId + ', 20)';
+    return VEC_AVG_FIELDS.has(fieldId) ? 'rank(vec_avg(' + inner + '))' : 'rank(' + inner + ')';
   }
 })();
