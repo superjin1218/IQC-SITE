@@ -238,7 +238,7 @@
     downloadCsv('field_catalog_all.csv', rows.slice());
   });
 
-  fetch('assets/data.json')
+  fetch('assets/fields_catalog.json')
     .then(function(response) {
       if (!response.ok) throw new Error('HTTP ' + response.status);
       return response.json();
