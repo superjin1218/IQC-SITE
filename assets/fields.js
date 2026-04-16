@@ -79,7 +79,7 @@
   let sortKey = 'fitness';
   let sortDir = -1;
   const BASE_DATA_URL = 'assets/data.json';
-  const META_DATA_URL = 'assets/field_meta.json';
+  const EXPR_DATA_URL = 'assets/field_expr.json';
 
   function fmtNumber(decimals) {
     return function(v) {
@@ -121,7 +121,6 @@
             row.subcategory,
             row.dataset,
             row.status,
-            row.alpha_id,
           ].join(' ').toLowerCase();
           return haystack.includes(filterQ);
         })
@@ -203,9 +202,6 @@
       'subcategory',
       'dataset',
       'status',
-      'alpha_id',
-      'returns',
-      'drawdown',
     ];
     const lines = [columns.join(',')];
     sourceRows.forEach(function(row) {
@@ -245,21 +241,20 @@
       if (!response.ok) throw new Error('base data HTTP ' + response.status);
       return response.json();
     }),
-    fetch(META_DATA_URL).then(function(response) {
-      if (!response.ok) throw new Error('meta data HTTP ' + response.status);
+    fetch(EXPR_DATA_URL).then(function(response) {
+      if (!response.ok) throw new Error('expr data HTTP ' + response.status);
       return response.json();
     }),
   ])
     .then(function(results) {
       const baseData = results[0];
-      const metaData = results[1] || {};
-      const metaByField = metaData.fields || {};
+      const exprData = results[1] || {};
+      const exprByField = exprData.fields || {};
 
       rows = (baseData.fields || []).map(function(row) {
-        const meta = metaByField[row.field_id] || {};
         return {
           field_id: row.field_id,
-          expr: meta.expr || '',
+          expr: exprByField[row.field_id] || '',
           sharpe: toNumber(row.sharpe),
           fitness: toNumber(row.fitness),
           turnover: toNumber(row.turnover),
@@ -267,10 +262,7 @@
           category: row.category || '',
           subcategory: row.subcategory || '',
           dataset: row.dataset || '',
-          status: meta.status || row.status || '',
-          alpha_id: meta.alpha_id || '',
-          returns: toNumber(meta.returns),
-          drawdown: toNumber(meta.drawdown),
+          status: row.status || '',
         };
       });
 
