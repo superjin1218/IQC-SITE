@@ -137,7 +137,13 @@
       <div class="view-overlay" id="graph-overlay">
         <div class="loading">
           <div class="loading-mark">∴</div>
-          <div class="loading-text">Surveying the alpha field…</div>
+          <div class="loading-text" id="loading-text">Surveying the alpha field…</div>
+          <div class="loading-bar"><div class="loading-bar-fill" id="loading-bar-fill"></div></div>
+          <div class="loading-meta mono">
+            <span id="loading-pct">0%</span>
+            <span class="loading-sep">·</span>
+            <span id="loading-stage">init</span>
+          </div>
         </div>
       </div>
       <div class="hud hud-graph">
@@ -174,6 +180,17 @@
           <button class="seg-btn active" data-thr="0.35">≥ 0.35</button>
           <button class="seg-btn" data-thr="0.50">≥ 0.50</button>
         </div>
+        <span class="groups-label">Export</span>
+        <div class="seg">
+          <button class="seg-btn" data-topn="5">Top 5</button>
+          <button class="seg-btn active" data-topn="10">Top 10</button>
+          <button class="seg-btn" data-topn="20">Top 20</button>
+          <button class="seg-btn" data-topn="all">All</button>
+        </div>
+        <button class="export-btn" id="export-csv-btn" title="Download representative fields per group as CSV">
+          <span class="export-arrow">↓</span>
+          <span class="export-label">CSV</span>
+        </button>
       </div>
       <div class="groups-grid" id="groups-grid"></div>
     </div>
