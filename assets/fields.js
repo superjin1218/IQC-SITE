@@ -79,7 +79,20 @@
   let sortKey = 'fitness';
   let sortDir = -1;
   const BASE_DATA_URL = 'assets/data.json';
-  const EXPR_DATA_URL = 'assets/field_expr.json';
+  const VEC_AVG_FIELDS = new Set([
+    'snt_buzz_bfl',
+    'snt_buzz_bfl_fast_d1',
+    'snt_buzz_fast_d1',
+    'snt_buzz_ret',
+    'snt_buzz_ret_fast_d1',
+    'snt_social_value',
+    'snt_social_volume',
+    'snt_value',
+    'snt_value_fast_d1',
+    'scl12_sentiment',
+    'scl12_sentiment_fast_d1',
+    'scl12_buzz_fast_d1',
+  ]);
 
   function fmtNumber(decimals) {
     return function(v) {
@@ -236,25 +249,16 @@
     downloadCsv('field_catalog_all.csv', rows.slice());
   });
 
-  Promise.all([
-    fetch(BASE_DATA_URL).then(function(response) {
+  fetch(BASE_DATA_URL)
+    .then(function(response) {
       if (!response.ok) throw new Error('base data HTTP ' + response.status);
       return response.json();
-    }),
-    fetch(EXPR_DATA_URL).then(function(response) {
-      if (!response.ok) throw new Error('expr data HTTP ' + response.status);
-      return response.json();
-    }),
-  ])
-    .then(function(results) {
-      const baseData = results[0];
-      const exprData = results[1] || {};
-      const exprByField = exprData.fields || {};
-
+    })
+    .then(function(baseData) {
       rows = (baseData.fields || []).map(function(row) {
         return {
           field_id: row.field_id,
-          expr: exprByField[row.field_id] || '',
+          expr: buildExpr(row.field_id),
           sharpe: toNumber(row.sharpe),
           fitness: toNumber(row.fitness),
           turnover: toNumber(row.turnover),
@@ -300,5 +304,10 @@
   function toNumber(value) {
     const num = Number(value);
     return Number.isFinite(num) ? num : null;
+  }
+
+  function buildExpr(fieldId) {
+    const inner = 'ts_backfill(' + fieldId + ', 20)';
+    return VEC_AVG_FIELDS.has(fieldId) ? 'rank(vec_avg(' + inner + '))' : 'rank(' + inner + ')';
   }
 })();

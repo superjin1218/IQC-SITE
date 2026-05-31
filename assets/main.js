@@ -1,546 +1,184 @@
+/* IQC ATLAS — Main controller
+   Boot order:
+     1. load all assets/data/*.json
+     2. populate stats + dataset legend + filter handlers
+     3. initialize each view lazily on tab switch
+*/
+(function () {
+  const Atlas = (window.Atlas = window.Atlas || {});
 
-(function() {
-  const views = {
-    graph:   { file: 'views/graph.html',   kind: 'iframe' },
-    map:     { file: 'views/map.html',     kind: 'iframe' },
-    heatmap: { file: 'views/heatmap.png',  kind: 'image' },
-    groups:  { kind: 'groups' },
+  const PLATE_TITLES = {
+    graph:   { mark: "PLATE I",   meta: "Network",   title: "Alpha Correlation" },
+    map:     { mark: "PLATE II",  meta: "UMAP",      title: "Embedding Space" },
+    heatmap: { mark: "PLATE III", meta: "Matrix",    title: "Cluster Correlation" },
+    groups:  { mark: "PLATE IV",  meta: "Clusters",  title: "Constellations" },
   };
 
-  const container = document.getElementById('view-container');
-  const viewLinks = document.querySelectorAll('.view-list li');
-  let currentIframe = null;
-  let pendingHighlight = null;
+  const viewInits = {};
+  let currentView = "graph";
 
-  function attachPanZoom(wrap, img) {
-    let scale = 1, tx = 0, ty = 0;
-    let dragging = false, sx = 0, sy = 0, stx = 0, sty = 0;
-    const MIN = 0.2, MAX = 20;
-    function apply() {
-      img.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + scale + ')';
+  function setView(v) {
+    currentView = v;
+    document.querySelectorAll(".view-container").forEach((c) => {
+      c.classList.toggle("hidden", c.dataset.view !== v);
+    });
+    document.querySelectorAll(".tab").forEach((t) => {
+      t.classList.toggle("active", t.dataset.view === v);
+    });
+    const meta = PLATE_TITLES[v] || {};
+    document.getElementById("overline-mark").textContent = meta.mark || "—";
+    document.getElementById("overline-title").textContent = meta.title || "—";
+    document.getElementById("overline-meta").textContent = meta.meta || "—";
+
+    if (!viewInits[v]) {
+      viewInits[v] = true;
+      if (Atlas[v] && Atlas[v].init) Atlas[v].init();
+    } else {
+      if (Atlas[v] && Atlas[v].redraw) Atlas[v].redraw();
     }
-    function reset() { scale = 1; tx = 0; ty = 0; apply(); }
-    img.addEventListener('load', reset); reset();
-    wrap.addEventListener('wheel', function(e) {
-      e.preventDefault();
-      const rect = wrap.getBoundingClientRect();
-      const cx = e.clientX - rect.left - rect.width / 2;
-      const cy = e.clientY - rect.top - rect.height / 2;
-      const factor = Math.exp(-e.deltaY * (e.ctrlKey ? 0.015 : 0.0025));
-      const next = Math.min(MAX, Math.max(MIN, scale * factor));
-      const k = next / scale;
-      tx = cx - (cx - tx) * k;
-      ty = cy - (cy - ty) * k;
-      scale = next;
-      apply();
-    }, { passive: false });
-    wrap.addEventListener('mousedown', function(e) {
-      dragging = true; sx = e.clientX; sy = e.clientY; stx = tx; sty = ty;
-      wrap.classList.add('grabbing');
-      e.preventDefault();
-    });
-    window.addEventListener('mousemove', function(e) {
-      if (!dragging) return;
-      tx = stx + (e.clientX - sx); ty = sty + (e.clientY - sy); apply();
-    });
-    window.addEventListener('mouseup', function() {
-      dragging = false; wrap.classList.remove('grabbing');
-    });
-    wrap.addEventListener('dblclick', reset);
-    // touch
-    let pd = 0, ps = 1, pcx = 0, pcy = 0;
-    wrap.addEventListener('touchstart', function(e) {
-      if (e.touches.length === 2) {
-        const a = e.touches[0], b = e.touches[1];
-        pd = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-        ps = scale;
-        const r = wrap.getBoundingClientRect();
-        pcx = (a.clientX + b.clientX) / 2 - r.left - r.width / 2;
-        pcy = (a.clientY + b.clientY) / 2 - r.top - r.height / 2;
-      } else if (e.touches.length === 1) {
-        dragging = true; sx = e.touches[0].clientX; sy = e.touches[0].clientY;
-        stx = tx; sty = ty;
-      }
-    }, { passive: false });
-    wrap.addEventListener('touchmove', function(e) {
-      if (e.touches.length === 2) {
-        e.preventDefault();
-        const a = e.touches[0], b = e.touches[1];
-        const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-        const next = Math.min(MAX, Math.max(MIN, ps * (d / pd)));
-        const k = next / scale;
-        tx = pcx - (pcx - tx) * k;
-        ty = pcy - (pcy - ty) * k;
-        scale = next;
-        apply();
-      } else if (e.touches.length === 1 && dragging) {
-        e.preventDefault();
-        tx = stx + (e.touches[0].clientX - sx);
-        ty = sty + (e.touches[0].clientY - sy);
-        apply();
-      }
-    }, { passive: false });
-    wrap.addEventListener('touchend', function() { dragging = false; });
   }
 
-  function showView(key) {
-    const v = views[key];
-    if (!v) return;
-    viewLinks.forEach(function(el) {
-      el.classList.toggle('active', el.dataset.view === key);
-    });
-    container.innerHTML = '';
-    currentIframe = null;
-    if (v.kind === 'iframe') {
-      const ifr = document.createElement('iframe');
-      ifr.className = 'view-iframe';
-      ifr.src = v.file;
-      ifr.addEventListener('load', function() {
-        if (pendingHighlight) {
-          try { ifr.contentWindow.postMessage({ type: 'highlight', field_id: pendingHighlight }, '*'); } catch (e) {}
-          pendingHighlight = null;
-        }
+  function setupStatsAndLegend(data) {
+    const { nodes, datasets } = data;
+    document.querySelector('[data-stat="n_fields"]').textContent = nodes.length.toLocaleString();
+    document.querySelector('[data-stat="n_sim"]').textContent =
+      nodes.filter((n) => n.alpha_id).length.toLocaleString();
+    document.querySelector('[data-stat="n_clusters"]').textContent =
+      (data.groups && data.groups.cluster_heatmap && data.groups.cluster_heatmap.labels.length) || "—";
+
+    const legend = document.getElementById("dataset-legend");
+    legend.innerHTML = "";
+    const sorted = [...datasets].sort((a, b) => b.count - a.count);
+    for (const d of sorted) {
+      const li = document.createElement("li");
+      li.className = "legend-row";
+      li.dataset.dataset = d.id;
+      li.dataset.active = "1";
+      li.innerHTML = `
+        <span class="legend-swatch" style="background:${d.color}"></span>
+        <span class="legend-name">${d.name}</span>
+        <span class="legend-count">${d.count}</span>
+      `;
+      li.addEventListener("click", () => {
+        const wasActive = li.dataset.active === "1";
+        li.dataset.active = wasActive ? "0" : "1";
+        Atlas.search.toggleDataset(d.id);
+        broadcastFilters();
       });
-      container.appendChild(ifr);
-      currentIframe = ifr;
-    } else if (v.kind === 'image') {
-      const wrap = document.createElement('div');
-      wrap.className = 'view-image-wrap pan-zoom';
-      const img = document.createElement('img');
-      img.className = 'view-image';
-      img.src = v.file;
-      img.alt = key;
-      img.draggable = false;
-      wrap.appendChild(img);
-      container.appendChild(wrap);
-      attachPanZoom(wrap, img);
-    } else if (v.kind === 'groups') {
-      renderGroupsPanel(container);
+      legend.appendChild(li);
     }
-    history.replaceState({}, '', '#' + key);
   }
 
-  // ============ GROUPS panel ============
-  let groupsData = null;
-  let groupsThreshold = '0.35';
-  let groupsExpanded = null;
-
-  function csvEscape(v) {
-    if (v === null || v === undefined) return '';
-    const s = String(v);
-    if (/[",\n\r]/.test(s)) {
-      return '"' + s.replace(/"/g, '""') + '"';
-    }
-    return s;
-  }
-
-  function exportGroupsCSV(threshold, groups, topN) {
-    const cols = [
-      'threshold', 'group_id', 'group_label', 'group_size', 'rank',
-      'field_id', 'fitness', 'sharpe', 'turnover', 'returns', 'drawdown',
-      'alpha_count', 'category', 'subcategory', 'dataset', 'alpha_id', 'expr'
-    ];
-    const lines = [cols.join(',')];
-    groups.forEach(function(g) {
-      const topMembers = (g.members || []).slice(0, topN);
-      topMembers.forEach(function(m, i) {
-        const row = [
-          threshold, g.id, g.label, g.size, (i + 1),
-          m.field_id,
-          (m.fitness || 0).toFixed(4),
-          (m.sharpe || 0).toFixed(4),
-          (m.turnover || 0).toFixed(5),
-          (m.returns || 0).toFixed(5),
-          (m.drawdown || 0).toFixed(4),
-          m.alpha_count || 0,
-          m.category || '',
-          m.subcategory || '',
-          m.dataset || '',
-          m.alpha_id || '',
-          m.expr || ''
-        ].map(csvEscape);
-        lines.push(row.join(','));
+  function setupFilters() {
+    document.querySelectorAll('[data-filter-type]').forEach((b) => {
+      b.addEventListener("click", () => {
+        const t = b.dataset.filterType;
+        const on = b.classList.toggle("active");
+        Atlas.search.setType(t, on);
+        broadcastFilters();
       });
     });
-    // UTF-8 BOM → Excel 한글 깨짐 방지
-    const blob = new Blob(['\ufeff' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'field_groups_thr' + threshold + '_top' + topN + '.csv';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(function() {
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }, 100);
+    const sharpe = document.getElementById("sharpe-min");
+    const sharpeRO = document.getElementById("sharpe-min-readout");
+    sharpe.addEventListener("input", () => {
+      Atlas.search.setSharpeMin(sharpe.value);
+      sharpeRO.textContent = Number(sharpe.value).toFixed(1).replace("-", "−");
+      broadcastFilters();
+    });
+    const corr = document.getElementById("corr-min");
+    const corrRO = document.getElementById("corr-min-readout");
+    corr.addEventListener("input", () => {
+      Atlas.search.setCorrMin(corr.value);
+      corrRO.textContent = Number(corr.value).toFixed(2);
+      if (Atlas.graph && Atlas.graph.rebuildEdges) {
+        Atlas.graph.rebuildEdges(+corr.value);
+      }
+    });
   }
 
-  function renderGroupsPanel(container) {
-    const panel = document.createElement('div');
-    panel.className = 'groups-panel';
-    panel.innerHTML = '<div class="groups-loading">loading groups...</div>';
-    container.appendChild(panel);
+  function broadcastFilters() {
+    if (viewInits.graph && Atlas.graph) Atlas.graph.applyFilters();
+    if (viewInits.map && Atlas.umap) Atlas.umap.applyFilters();
+    if (viewInits.heatmap && Atlas.heatmap) Atlas.heatmap.applyFilters();
+    if (viewInits.groups && Atlas.groups) Atlas.groups.applyFilters();
+  }
 
-    const render = function() {
-      panel.innerHTML = '';
-      if (!groupsData) {
-        panel.innerHTML = '<div class="groups-loading">no data</div>';
-        return;
-      }
+  function setupSearch() {
+    const input = document.getElementById("search-input");
+    const results = document.getElementById("search-results");
+    let focused = -1, current = [];
 
-      // header
-      const header = document.createElement('div');
-      header.className = 'groups-header';
-      const title = document.createElement('div');
-      title.className = 'groups-title';
-      title.textContent = 'GROUPS';
-      header.appendChild(title);
-
-      const explain = document.createElement('div');
-      explain.className = 'groups-explain';
-      explain.textContent = 'pick minimum combined correlation — lower = fewer / larger groups, higher = more / tighter groups';
-      header.appendChild(explain);
-
-      // threshold slider
-      const thresholds = Object.keys(groupsData).sort(function(a, b) {
-        return parseFloat(a) - parseFloat(b);
+    function render() {
+      results.innerHTML = "";
+      current.forEach((r, i) => {
+        const div = document.createElement("div");
+        div.className = "search-result" + (i === focused ? " focused" : "");
+        div.innerHTML = `
+          <span class="search-result-id">${r.id}</span>
+          <span class="search-result-meta">${r.dataset || ""} · sharpe ${Number(r.sharpe || 0).toFixed(2)}</span>
+          <span class="search-result-desc">${(r.desc || "").slice(0, 120)}</span>
+        `;
+        div.addEventListener("mousedown", (e) => {
+          e.preventDefault();
+          Atlas.detail.open(r.id);
+          results.classList.remove("open");
+          input.value = r.id;
+        });
+        results.appendChild(div);
       });
-      if (thresholds.indexOf(groupsThreshold) === -1) {
-        // 기본값이 없으면 중간값 근처로
-        groupsThreshold = thresholds[Math.floor(thresholds.length / 2)] || thresholds[0];
-      }
-      const currentIdx = thresholds.indexOf(groupsThreshold);
-      const currentCount = (groupsData[groupsThreshold] || []).length;
+      results.classList.toggle("open", current.length > 0);
+    }
 
-      const sliderWrap = document.createElement('div');
-      sliderWrap.className = 'groups-slider';
-      sliderWrap.innerHTML =
-        '<div class="slider-top">' +
-          '<span class="slider-label">min combined ≥</span>' +
-          '<span class="slider-value" id="grp-thr-val">' + groupsThreshold + '</span>' +
-          '<span class="slider-count"><b id="grp-count">' + currentCount + '</b> groups</span>' +
-        '</div>' +
-        '<input type="range" class="slider-range" id="grp-slider" ' +
-          'min="0" max="' + (thresholds.length - 1) + '" step="1" value="' + currentIdx + '">' +
-        '<div class="slider-ticks">' +
-          '<span>' + thresholds[0] + '</span>' +
-          '<span>' + thresholds[Math.floor(thresholds.length / 2)] + '</span>' +
-          '<span>' + thresholds[thresholds.length - 1] + '</span>' +
-        '</div>';
-      header.appendChild(sliderWrap);
-
-      // export CSV
-      const exportBar = document.createElement('div');
-      exportBar.className = 'groups-export';
-      exportBar.innerHTML =
-        '<span class="ex-label">export top</span>' +
-        '<input type="number" id="grp-topn" class="ex-input" value="1" min="1" max="50" step="1">' +
-        '<span class="ex-label">/ group (current threshold)</span>' +
-        '<button class="ex-btn" id="grp-export">⬇ download CSV</button>';
-      header.appendChild(exportBar);
-
-      panel.appendChild(header);
-
-      // slider 이벤트 — live update 없이 group list 만 다시 그림
-      const sliderEl = sliderWrap.querySelector('#grp-slider');
-      const thrValEl = sliderWrap.querySelector('#grp-thr-val');
-      const countEl = sliderWrap.querySelector('#grp-count');
-      sliderEl.addEventListener('input', function() {
-        const idx = parseInt(sliderEl.value, 10);
-        groupsThreshold = thresholds[idx];
-        groupsExpanded = null;
-        thrValEl.textContent = groupsThreshold;
-        countEl.textContent = (groupsData[groupsThreshold] || []).length;
-        renderList();
-      });
-
-      // group list 컨테이너
-      const list = document.createElement('div');
-      list.className = 'groups-list';
-      panel.appendChild(list);
-
-      function renderList() {
-        list.innerHTML = '';
-        const groups = groupsData[groupsThreshold] || [];
-        groups.forEach(function(g) {
-        const row = document.createElement('div');
-        row.className = 'group-row' + (groupsExpanded === g.id ? ' expanded' : '');
-
-        const head = document.createElement('div');
-        head.className = 'group-head';
-        head.addEventListener('click', function() {
-          groupsExpanded = (groupsExpanded === g.id) ? null : g.id;
-          renderList();
-        });
-
-        const arrow = document.createElement('span');
-        arrow.className = 'group-arrow';
-        arrow.textContent = groupsExpanded === g.id ? '▼' : '▶';
-
-        const label = document.createElement('span');
-        label.className = 'group-label';
-        label.textContent = g.label || '—';
-
-        const size = document.createElement('span');
-        size.className = 'group-size';
-        size.textContent = g.size + ' fields';
-
-        const fit = document.createElement('span');
-        fit.className = 'group-fit';
-        fit.innerHTML = '<em>max fit </em>' + g.max_fitness.toFixed(2) +
-                        '  <em>avg </em>' + g.avg_fitness.toFixed(2);
-
-        head.appendChild(arrow);
-        head.appendChild(label);
-        head.appendChild(size);
-        head.appendChild(fit);
-        row.appendChild(head);
-
-        if (groupsExpanded === g.id) {
-          const body = document.createElement('div');
-          body.className = 'group-body';
-
-          // mini table (이미 fitness desc 로 정렬되어 있음)
-          const tbl = document.createElement('table');
-          tbl.className = 'group-members';
-          tbl.innerHTML = '<thead><tr>' +
-            '<th>field</th>' +
-            '<th class="n">fitness</th>' +
-            '<th class="n">sharpe</th>' +
-            '<th class="n">turnover</th>' +
-            '<th class="n">α</th>' +
-            '<th>category</th>' +
-            '<th>subcategory</th>' +
-            '<th></th>' +
-            '</tr></thead>';
-          const tb = document.createElement('tbody');
-          g.members.forEach(function(m) {
-            const tr = document.createElement('tr');
-
-            const tdF = document.createElement('td');
-            tdF.className = 'fid';
-            const a = document.createElement('a');
-            a.href = 'detail.html?fid=' + encodeURIComponent(m.field_id);
-            a.target = '_blank';
-            a.textContent = m.field_id;
-            tdF.appendChild(a);
-            tr.appendChild(tdF);
-
-            function numCell(v, dec, goodGt) {
-              const td = document.createElement('td');
-              td.className = 'n';
-              td.textContent = (v || 0).toFixed(dec);
-              if (goodGt !== undefined && v >= goodGt) td.classList.add('num-pos');
-              return td;
-            }
-            tr.appendChild(numCell(m.fitness, 2, 1.0));
-            tr.appendChild(numCell(m.sharpe, 2, 1.25));
-            tr.appendChild(numCell(m.turnover, 3));
-
-            const tdA = document.createElement('td');
-            tdA.className = 'n';
-            tdA.textContent = m.alpha_count || 0;
-            tr.appendChild(tdA);
-
-            const tdC = document.createElement('td');
-            tdC.className = 'sub';
-            tdC.textContent = m.category || '—';
-            tr.appendChild(tdC);
-
-            const tdS = document.createElement('td');
-            tdS.className = 'sub';
-            tdS.textContent = m.subcategory || '—';
-            tr.appendChild(tdS);
-
-            const tdAct = document.createElement('td');
-            tdAct.className = 'act';
-            const act = document.createElement('a');
-            act.className = 'mini-btn';
-            act.textContent = 'focus';
-            act.addEventListener('click', function(ev) {
-              ev.preventDefault();
-              highlightOnCurrent(m.field_id);
-            });
-            tdAct.appendChild(act);
-            tr.appendChild(tdAct);
-
-            tb.appendChild(tr);
-          });
-          tbl.appendChild(tb);
-          body.appendChild(tbl);
-          row.appendChild(body);
-        }
-
-          list.appendChild(row);
-        });
-      }  // end renderList
-      renderList();
-
-      // export CSV handler
-      const exportBtn = panel.querySelector('#grp-export');
-      const topnInput = panel.querySelector('#grp-topn');
-      if (exportBtn) {
-        exportBtn.addEventListener('click', function() {
-          const n = Math.max(1, parseInt(topnInput.value || '1', 10));
-          exportGroupsCSV(groupsThreshold, groupsData[groupsThreshold] || [], n);
-        });
-      }
-    };
-
-    if (groupsData) {
+    input.addEventListener("input", () => {
+      current = Atlas.search.query(input.value);
+      focused = -1;
       render();
-    } else {
-      fetch('assets/groups.json')
-        .then(function(r) { return r.json(); })
-        .then(function(d) {
-          groupsData = d;
-          if (groupsData && !groupsData[groupsThreshold]) {
-            groupsThreshold = Object.keys(groupsData).sort()[0];
-          }
-          render();
-        })
-        .catch(function(e) {
-          panel.innerHTML = '<div class="groups-loading">failed: ' + e.message + '</div>';
-        });
+    });
+    input.addEventListener("focus", () => { if (current.length) results.classList.add("open"); });
+    input.addEventListener("blur", () => { setTimeout(() => results.classList.remove("open"), 120); });
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowDown") { focused = Math.min(current.length - 1, focused + 1); render(); e.preventDefault(); }
+      else if (e.key === "ArrowUp") { focused = Math.max(0, focused - 1); render(); e.preventDefault(); }
+      else if (e.key === "Enter" && focused >= 0) {
+        Atlas.detail.open(current[focused].id);
+        results.classList.remove("open");
+        e.preventDefault();
+      } else if (e.key === "Escape") { results.classList.remove("open"); input.blur(); }
+    });
+
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "/" && document.activeElement !== input) { e.preventDefault(); input.focus(); }
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") { e.preventDefault(); input.focus(); }
+    });
+  }
+
+  function setupTabs() {
+    document.querySelectorAll(".tab").forEach((t) => {
+      t.addEventListener("click", () => setView(t.dataset.view));
+    });
+  }
+
+  async function boot() {
+    let data;
+    try {
+      data = await Atlas.data.load();
+    } catch (err) {
+      console.error(err);
+      document.getElementById("graph-overlay").innerHTML = `
+        <div class="loading">
+          <div class="loading-mark" style="color: var(--rust)">!</div>
+          <div class="loading-text">Atlas data not yet generated. Run the pipeline first.</div>
+        </div>`;
+      return;
     }
+    Atlas.search.init(data.nodes);
+    setupStatsAndLegend(data);
+    setupFilters();
+    setupSearch();
+    setupTabs();
+    Atlas.detail.init();
+    setView("graph");
   }
 
-  function currentKey() {
-    return (location.hash || '#graph').slice(1);
-  }
-
-  function highlightOnCurrent(fid) {
-    const key = currentKey();
-    if (views[key] && views[key].kind === 'iframe' && currentIframe) {
-      try {
-        currentIframe.contentWindow.postMessage({ type: 'highlight', field_id: fid }, '*');
-      } catch (e) {}
-    } else {
-      // heatmap 활성 상태 → graph 로 스위칭 후 반영
-      pendingHighlight = fid;
-      showView('graph');
-    }
-  }
-
-  viewLinks.forEach(function(el) {
-    el.addEventListener('click', function() { showView(el.dataset.view); });
-  });
-
-  const initial = currentKey();
-  showView(views[initial] ? initial : 'graph');
-
-  fetch('assets/data.json')
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      window.FIELD_DATA = data;
-      const input = document.getElementById('search-input');
-      const results = document.getElementById('search-results');
-
-      function render(matches) {
-        results.innerHTML = '';
-        if (!matches.length) {
-          const e = document.createElement('div');
-          e.className = 'search-empty';
-          e.textContent = 'no match';
-          results.appendChild(e);
-          return;
-        }
-        matches.forEach(function(m) {
-          const div = document.createElement('div');
-          div.className = 'search-result';
-          div.dataset.fid = m.field_id;
-
-          const idLine = document.createElement('div');
-          idLine.className = 'sr-id';
-          idLine.textContent = m.field_id;
-          div.appendChild(idLine);
-
-          const meta = document.createElement('div');
-          meta.className = 'sr-meta';
-          const cat = document.createElement('span');
-          cat.className = 'cat';
-          cat.textContent = (m.category || '—') + (m.subcategory ? ' / ' + m.subcategory : '');
-          const num = document.createElement('span');
-          num.className = 'num';
-          const parts = [];
-          if (m.alpha_count) parts.push(m.alpha_count + 'α');
-          num.textContent = parts.join(' · ');
-          meta.appendChild(cat); meta.appendChild(num);
-          div.appendChild(meta);
-
-          const stats = document.createElement('div');
-          stats.className = 'sr-stats';
-          function stat(label, val, cls) {
-            const s = document.createElement('span');
-            s.className = 'sr-stat' + (cls ? ' ' + cls : '');
-            s.innerHTML = '<em>' + label + '</em>' + val;
-            return s;
-          }
-          const sh = m.sharpe !== undefined ? Number(m.sharpe).toFixed(2) : '—';
-          const fi = m.fitness !== undefined ? Number(m.fitness).toFixed(2) : '—';
-          const to = m.turnover !== undefined ? Number(m.turnover).toFixed(3) : '—';
-          stats.appendChild(stat('sh ', sh, Number(m.sharpe) >= 1.25 ? 'good' : ''));
-          stats.appendChild(stat('fit ', fi, Number(m.fitness) >= 1.0 ? 'good' : ''));
-          stats.appendChild(stat('to ', to, ''));
-          div.appendChild(stats);
-
-          const actions = document.createElement('div');
-          actions.className = 'sr-actions';
-          const focusBtn = document.createElement('a');
-          focusBtn.textContent = 'focus';
-          focusBtn.addEventListener('click', function(ev) {
-            ev.stopPropagation();
-            highlightOnCurrent(m.field_id);
-          });
-          const detailBtn = document.createElement('a');
-          detailBtn.textContent = '자세히 보기';
-          detailBtn.href = 'detail.html?fid=' + encodeURIComponent(m.field_id);
-          detailBtn.target = '_blank';
-          detailBtn.rel = 'noopener';
-          const copyBtn = document.createElement('a');
-          copyBtn.textContent = 'copy';
-          copyBtn.addEventListener('click', function(ev) {
-            ev.stopPropagation();
-            navigator.clipboard.writeText(m.field_id);
-            copyBtn.textContent = '✓';
-            setTimeout(function() { copyBtn.textContent = 'copy'; }, 1000);
-          });
-          actions.appendChild(focusBtn);
-          actions.appendChild(detailBtn);
-          actions.appendChild(copyBtn);
-          div.appendChild(actions);
-
-          div.addEventListener('click', function() { highlightOnCurrent(m.field_id); });
-          results.appendChild(div);
-        });
-      }
-
-      function score(f, q) {
-        const fid = (f.field_id || '').toLowerCase();
-        const sub = (f.subcategory || '').toLowerCase();
-        const dset = (f.dataset || '').toLowerCase();
-        const cat = (f.category || '').toLowerCase();
-        if (fid === q) return 100;
-        if (fid.startsWith(q)) return 80;
-        if (fid.includes(q)) return 60;
-        if (sub.includes(q)) return 40;
-        if (dset.includes(q)) return 30;
-        if (cat.includes(q)) return 20;
-        return 0;
-      }
-
-      input.addEventListener('input', function() {
-        const q = input.value.trim().toLowerCase();
-        if (q.length < 2) { results.innerHTML = ''; return; }
-        const scored = (data.fields || [])
-          .map(function(f) { return { f: f, s: score(f, q) }; })
-          .filter(function(x) { return x.s > 0; })
-          .sort(function(a, b) { return b.s - a.s || b.f.alpha_count - a.f.alpha_count; })
-          .slice(0, 30)
-          .map(function(x) { return x.f; });
-        render(scored);
-      });
-    })
-    .catch(function() {});
+  document.addEventListener("DOMContentLoaded", boot);
 })();
