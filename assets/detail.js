@@ -1,170 +1,143 @@
+/* IQC ATLAS — Detail panel + PnL sparkline */
+(function () {
+  const Atlas = (window.Atlas = window.Atlas || {});
 
-(function() {
-  const params = new URLSearchParams(location.search);
-  const fid = params.get('fid');
-  const titleEl = document.getElementById('detail-title');
-  const metaEl = document.getElementById('detail-meta');
-  const bodyEl = document.getElementById('detail-table-body');
-  const headEl = document.getElementById('detail-table-head');
-  const loadingEl = document.getElementById('detail-loading');
-  const errorEl = document.getElementById('detail-error');
-  const tableEl = document.getElementById('detail-table');
-  const filterEl = document.getElementById('detail-filter');
-  const countEl = document.getElementById('detail-count');
+  const els = {};
+  function $(id) { return (els[id] = els[id] || document.getElementById(id)); }
 
-  if (!fid) {
-    errorEl.textContent = 'no field_id in URL. use detail.html?fid=...';
-    errorEl.style.display = 'block';
-    loadingEl.style.display = 'none';
-    return;
+  function fmt(v, digits = 2) {
+    if (v === null || v === undefined || isNaN(v)) return "—";
+    return Number(v).toFixed(digits);
   }
-  titleEl.textContent = fid;
-  document.title = fid + ' — Field Detail';
+  function signedTone(v) { return v > 0 ? "pos" : v < 0 ? "neg" : ""; }
 
-  // 컬럼 정의: [key, label, formatter, class]
-  const COLS = [
-    { key: 'field_id', label: 'field',      fmt: function(v, row) {
-        const a = document.createElement('a');
-        a.href = 'detail.html?fid=' + encodeURIComponent(v);
-        a.textContent = v;
-        return a;
-      }, cls: 'fid' },
-    { key: 'combined', label: 'combined',   fmt: function(v) { return v.toFixed(4); }, num: true },
-    { key: 'pnl',      label: 'pnl corr',   fmt: function(v) { return v.toFixed(4); }, num: true },
-    { key: 'text',     label: 'text sim',   fmt: function(v) { return v.toFixed(4); }, num: true },
-    { key: 'fitness',  label: 'fitness',    fmt: function(v) { return (v || 0).toFixed(2); }, num: true },
-    { key: 'sharpe',   label: 'sharpe',     fmt: function(v) { return (v || 0).toFixed(2); }, num: true },
-    { key: 'turnover', label: 'turnover',   fmt: function(v) { return (v || 0).toFixed(3); }, num: true },
-    { key: 'category', label: 'category',   fmt: function(v) { return v || '—'; }, cls: 'cat' },
-    { key: 'subcategory', label: 'subcategory', fmt: function(v) { return v || '—'; }, cls: 'cat' },
-    { key: 'alpha_count', label: 'α count', fmt: function(v) { return String(v || 0); }, num: true },
-  ];
+  function drawPnlChart(canvas, points) {
+    const ctx = canvas.getContext("2d");
+    const dpr = window.devicePixelRatio || 1;
+    const W = canvas.offsetWidth, H = canvas.offsetHeight;
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, W, H);
+    if (!points || !points.length) return;
 
-  let rows = [];
-  let sortKey = 'combined';
-  let sortDir = -1;  // -1 desc, 1 asc
-  let filterQ = '';
+    let acc = 0;
+    const series = points.map((p) => { acc += p.v; return { d: p.d, c: acc }; });
+    const min = Math.min(...series.map((s) => s.c));
+    const max = Math.max(...series.map((s) => s.c));
+    const pad = 8;
+    const W2 = W - pad * 2, H2 = H - pad * 2;
 
-  function renderHead() {
-    headEl.innerHTML = '';
-    const tr = document.createElement('tr');
-    COLS.forEach(function(c) {
-      const th = document.createElement('th');
-      th.textContent = c.label;
-      if (c.key === sortKey) {
-        th.classList.add('sorted');
-        const arrow = document.createElement('span');
-        arrow.className = 'arrow';
-        arrow.textContent = sortDir < 0 ? '▼' : '▲';
-        th.appendChild(arrow);
-      }
-      th.addEventListener('click', function() {
-        if (sortKey === c.key) sortDir *= -1;
-        else { sortKey = c.key; sortDir = c.num ? -1 : 1; }
-        renderHead();
-        renderBody();
-      });
-      tr.appendChild(th);
+    if (min < 0 && max > 0) {
+      const zy = pad + H2 * (max / (max - min));
+      ctx.strokeStyle = "rgba(122, 117, 99, 0.4)";
+      ctx.setLineDash([2, 3]);
+      ctx.beginPath(); ctx.moveTo(pad, zy); ctx.lineTo(W - pad, zy); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    ctx.beginPath();
+    series.forEach((s, i) => {
+      const x = pad + (i / (series.length - 1)) * W2;
+      const y = pad + H2 - ((s.c - min) / (max - min || 1)) * H2;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     });
-    headEl.appendChild(tr);
+    ctx.strokeStyle = "#c89455";
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+
+    ctx.lineTo(W - pad, H - pad);
+    ctx.lineTo(pad, H - pad);
+    ctx.closePath();
+    const grad = ctx.createLinearGradient(0, pad, 0, H - pad);
+    grad.addColorStop(0, "rgba(200, 148, 85, 0.22)");
+    grad.addColorStop(1, "rgba(200, 148, 85, 0.0)");
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    const last = series[series.length - 1];
+    const lx = pad + W2;
+    const ly = pad + H2 - ((last.c - min) / (max - min || 1)) * H2;
+    ctx.fillStyle = "#e6a86b";
+    ctx.beginPath(); ctx.arc(lx, ly, 2.5, 0, Math.PI * 2); ctx.fill();
   }
 
-  function renderBody() {
-    const filtered = filterQ
-      ? rows.filter(function(r) {
-          return (r.field_id || '').toLowerCase().includes(filterQ) ||
-                 (r.category || '').toLowerCase().includes(filterQ) ||
-                 (r.subcategory || '').toLowerCase().includes(filterQ);
-        })
-      : rows;
+  async function open(id) {
+    const node = Atlas.data.byId(id);
+    if (!node) return;
 
-    const sorted = filtered.slice().sort(function(a, b) {
-      const va = a[sortKey], vb = b[sortKey];
-      if (va === undefined || va === null) return 1;
-      if (vb === undefined || vb === null) return -1;
-      if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * sortDir;
-      return String(va).localeCompare(String(vb)) * sortDir;
-    });
+    document.getElementById("app").setAttribute("data-detail-open", "1");
+    window.dispatchEvent(new Event("resize"));
 
-    countEl.textContent = sorted.length + ' / ' + rows.length + ' rows';
-    bodyEl.innerHTML = '';
-    const frag = document.createDocumentFragment();
-    sorted.forEach(function(r) {
-      const tr = document.createElement('tr');
-      COLS.forEach(function(c) {
-        const td = document.createElement('td');
-        const v = r[c.key];
-        const out = c.fmt(v, r);
-        if (typeof out === 'string') td.textContent = out;
-        else td.appendChild(out);
-        if (c.cls) td.classList.add(c.cls);
-        if (c.num && typeof v === 'number') {
-          if (v > 0.001) td.classList.add('num-pos');
-          else if (v < -0.001) td.classList.add('num-neg');
-        }
-        tr.appendChild(td);
+    const allNodes = Atlas.data.get().nodes;
+    const idx = allNodes.findIndex((n) => n.id === id);
+    $("detail-num").textContent = String(idx + 1).padStart(4, "0");
+    $("detail-total").textContent = String(allNodes.length).padStart(4, "0");
+
+    $("detail-id").textContent = node.id;
+    $("detail-type").textContent = node.type || "—";
+    $("detail-type").setAttribute("data-tone", (node.type || "").toLowerCase());
+    $("detail-dataset").textContent = node.dataset || "—";
+    $("detail-dataset").setAttribute("data-tone", "dataset");
+    $("detail-reducer").textContent = node.reducer || "—";
+    $("detail-desc").textContent = node.desc || "— no description —";
+
+    $("metric-sharpe").textContent = fmt(node.sharpe);
+    $("metric-sharpe").setAttribute("data-tone", signedTone(node.sharpe));
+    $("metric-fitness").textContent = fmt(node.fitness);
+    $("metric-fitness").setAttribute("data-tone", signedTone(node.fitness));
+    $("metric-turnover").textContent = node.turnover != null ? (node.turnover * 100).toFixed(1) + "%" : "—";
+    $("metric-returns").textContent = node.returns != null ? (node.returns * 100).toFixed(2) + "%" : "—";
+    $("metric-returns").setAttribute("data-tone", signedTone(node.returns));
+    $("metric-drawdown").textContent = node.drawdown != null ? (node.drawdown * 100).toFixed(2) + "%" : "—";
+    $("metric-ls").textContent = `${node.longCount ?? "—"} / ${node.shortCount ?? "—"}`;
+
+    $("detail-expr").textContent = node.expr || "—";
+    $("detail-alpha-id").textContent = node.alpha_id || "—";
+
+    const nbList = $("neighbor-list");
+    nbList.innerHTML = "";
+    const neighbors = Atlas.data.neighborsOf(id).slice(0, 10);
+    if (!neighbors.length) {
+      nbList.innerHTML = `<li style="color:var(--ink-faint); font-family:Fraunces; font-style:italic; padding:6px 0;">— no constellation —</li>`;
+    } else {
+      neighbors.forEach((nb, i) => {
+        const li = document.createElement("li");
+        li.className = "neighbor";
+        li.innerHTML = `
+          <span class="neighbor-num">${String(i + 1).padStart(2, "0")}</span>
+          <span class="neighbor-id">${nb.id}</span>
+          <span class="neighbor-corr">${nb.r.toFixed(3)}</span>
+        `;
+        li.addEventListener("click", () => open(nb.id));
+        nbList.appendChild(li);
       });
-      frag.appendChild(tr);
-    });
-    bodyEl.appendChild(frag);
+    }
+
+    const canvas = document.getElementById("pnl-chart");
+    const wrap = canvas.parentElement;
+    const series = await Atlas.data.pnl(id);
+    if (series && series.length) {
+      wrap.setAttribute("data-empty", "0");
+      requestAnimationFrame(() => drawPnlChart(canvas, series));
+    } else {
+      wrap.setAttribute("data-empty", "1");
+      const ctx = canvas.getContext("2d"); ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    if (Atlas.graph) Atlas.graph.select(id);
   }
 
-  filterEl.addEventListener('input', function() {
-    filterQ = filterEl.value.trim().toLowerCase();
-    renderBody();
-  });
+  function close() {
+    document.getElementById("app").removeAttribute("data-detail-open");
+    if (Atlas.graph) Atlas.graph.select(null);
+    window.dispatchEvent(new Event("resize"));
+  }
 
-  // fetch neighbor data
-  fetch('assets/neighbors/' + encodeURIComponent(fid) + '.json')
-    .then(function(r) {
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      return r.json();
-    })
-    .then(function(data) {
-      loadingEl.style.display = 'none';
-      tableEl.style.display = '';
-      const self = data.self || {};
-      const metaParts = [
-        ['category', self.category || '—'],
-        ['subcategory', self.subcategory || '—'],
-        ['dataset', self.dataset || '—'],
-        ['fitness', self.fitness !== undefined ? Number(self.fitness).toFixed(3) : '—'],
-        ['sharpe', self.sharpe !== undefined ? Number(self.sharpe).toFixed(3) : '—'],
-        ['turnover', self.turnover !== undefined ? Number(self.turnover).toFixed(4) : '—'],
-        ['α count', self.alpha_count || 0],
-        ['neighbors', (data.rows || []).length],
-      ];
-      metaEl.innerHTML = '';
-      metaParts.forEach(function(p) {
-        const span = document.createElement('span');
-        const l = document.createElement('span');
-        l.className = 'label'; l.textContent = p[0] + ':';
-        const v = document.createElement('span');
-        v.className = 'val'; v.textContent = p[1];
-        span.appendChild(l); span.appendChild(v);
-        metaEl.appendChild(span);
-      });
-
-      rows = (data.rows || []).map(function(row) {
-        return {
-          field_id: row[0],
-          combined: row[1],
-          pnl: row[2],
-          text: row[3],
-          sharpe: row[4],
-          fitness: row[5],
-          turnover: row[6],
-          category: row[7],
-          subcategory: row[8],
-          alpha_count: row[9],
-        };
-      });
-      renderHead();
-      renderBody();
-    })
-    .catch(function(e) {
-      loadingEl.style.display = 'none';
-      errorEl.textContent = 'failed to load neighbors: ' + e.message;
-      errorEl.style.display = 'block';
-    });
+  Atlas.detail = {
+    init() {
+      const closeBtn = document.getElementById("detail-close");
+      if (closeBtn) closeBtn.addEventListener("click", close);
+    },
+    open, close,
+  };
 })();
