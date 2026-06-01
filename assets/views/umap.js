@@ -119,7 +119,7 @@
     }
   }
 
-  Atlas.umap = {
+  Atlas.map = Atlas.umap = {
     init() {
       canvas = document.getElementById("map-canvas");
       ctx = canvas.getContext("2d");

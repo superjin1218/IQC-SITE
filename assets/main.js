@@ -98,7 +98,7 @@
 
   function broadcastFilters() {
     if (viewInits.graph && Atlas.graph) Atlas.graph.applyFilters();
-    if (viewInits.map && Atlas.umap) Atlas.umap.applyFilters();
+    if (viewInits.map && Atlas.map) Atlas.map.applyFilters();
     if (viewInits.heatmap && Atlas.heatmap) Atlas.heatmap.applyFilters();
     if (viewInits.groups && Atlas.groups) Atlas.groups.applyFilters();
   }
