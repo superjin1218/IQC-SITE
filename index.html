@@ -1,290 +1,216 @@
 <!doctype html>
-<html lang="ko" data-theme="atlas">
+<html lang="ko" data-theme="terminal">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>IQC · ATLAS — An Atlas of Alpha Factors</title>
-<meta name="description" content="A cartographic study of 6,089 WorldQuant Brain alpha factors mapped by realized PnL correlation.">
+<title>IQC · FIELD ATLAS</title>
+<meta name="description" content="Terminal interface for 6,132 WorldQuant Brain alpha factors mapped by realized PnL correlation.">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,300..900,0..100;1,9..144,300..900,0..100&family=Geist:wght@300..700&family=JetBrains+Mono:wght@400..600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
 <link rel="stylesheet" href="assets/style.css">
 </head>
 
 <body>
-<div class="grain" aria-hidden="true"></div>
-
 <div class="app" id="app">
 
-  <!-- ─── TOPBAR ─────────────────────────────────────── -->
-  <header class="topbar">
-    <a class="wordmark" href="./">
-      <span class="wordmark-mark">IQC</span>
-      <span class="wordmark-dot">·</span>
-      <span class="wordmark-name">ATLAS</span>
-    </a>
-
-    <nav class="tabs" role="tablist" aria-label="Views">
-      <button class="tab active" data-view="graph" role="tab">
-        <span class="tab-mark">01</span>
-        <span class="tab-name">Graph</span>
-      </button>
-      <button class="tab" data-view="map" role="tab">
-        <span class="tab-mark">02</span>
-        <span class="tab-name">Map</span>
-      </button>
-      <button class="tab" data-view="heatmap" role="tab">
-        <span class="tab-mark">03</span>
-        <span class="tab-name">Heatmap</span>
-      </button>
-      <button class="tab" data-view="groups" role="tab">
-        <span class="tab-mark">04</span>
-        <span class="tab-name">Groups</span>
-      </button>
-    </nav>
-
-    <div class="search">
-      <input id="search-input" class="search-input" type="search"
-             placeholder="field id, dataset, description..."
-             autocomplete="off" spellcheck="false">
-      <kbd class="search-key">/</kbd>
-      <div id="search-results" class="search-results" role="listbox"></div>
+  <!-- ─── HEADER ──────────────────────────────────────── -->
+  <header class="hdr">
+    <div class="hdr-brand">
+      <span class="hdr-brand-mark">IQC</span>
+      <span class="hdr-brand-dot">·</span>
+      <span class="hdr-brand-name">FIELD ATLAS</span>
+    </div>
+    <div class="hdr-stats">
+      <span class="hdr-stat"><em>fields</em> <span data-stat="n_fields">—</span></span>
+      <span class="hdr-stat-sep">/</span>
+      <span class="hdr-stat"><em>simulated</em> <span data-stat="n_sim">—</span></span>
+      <span class="hdr-stat-sep">/</span>
+      <span class="hdr-stat"><em>clusters</em> <span data-stat="n_clusters">—</span></span>
+      <span class="hdr-stat-sep">/</span>
+      <span class="hdr-stat"><em>edges</em> <span data-stat="n_edges">—</span></span>
     </div>
   </header>
 
-  <!-- ─── LEFT RAIL: FILTERS ──────────────────────────── -->
-  <aside class="rail rail-left">
-    <section class="rail-block">
-      <h3 class="rail-title">Edition</h3>
-      <div class="meta-grid">
-        <div class="meta-row"><span class="meta-key">fields</span><span class="meta-val mono" data-stat="n_fields">—</span></div>
-        <div class="meta-row"><span class="meta-key">simulated</span><span class="meta-val mono" data-stat="n_sim">—</span></div>
-        <div class="meta-row"><span class="meta-key">corr-edges</span><span class="meta-val mono" data-stat="n_edges">—</span></div>
-        <div class="meta-row"><span class="meta-key">clusters</span><span class="meta-val mono" data-stat="n_clusters">—</span></div>
+  <!-- ─── SIDEBAR ─────────────────────────────────────── -->
+  <aside class="sb">
+
+    <section class="sb-sec">
+      <div class="sb-title">View</div>
+      <ul class="vl">
+        <li class="vl-row active" data-view="graph">
+          <span class="vl-num">01</span><span class="vl-name">GRAPH</span><span class="vl-arrow">›</span>
+        </li>
+        <li class="vl-row" data-view="map">
+          <span class="vl-num">02</span><span class="vl-name">MAP</span><span class="vl-arrow">›</span>
+        </li>
+        <li class="vl-row" data-view="heatmap">
+          <span class="vl-num">03</span><span class="vl-name">HEATMAP</span><span class="vl-arrow">›</span>
+        </li>
+        <li class="vl-row" data-view="groups">
+          <span class="vl-num">04</span><span class="vl-name">GROUPS</span><span class="vl-arrow">›</span>
+        </li>
+      </ul>
+    </section>
+
+    <section class="sb-sec">
+      <div class="sb-title">Search</div>
+      <div class="sr">
+        <input id="search-input" class="sr-input" type="search"
+               placeholder="field id, dataset…" autocomplete="off" spellcheck="false">
+        <kbd class="sr-key">/</kbd>
+      </div>
+      <div id="search-results" class="sr-results" role="listbox"></div>
+    </section>
+
+    <section class="sb-sec">
+      <div class="sb-title">Filter · Type</div>
+      <div class="chips">
+        <button class="chip on" data-filter-type="MATRIX">MATRIX</button>
+        <button class="chip on" data-filter-type="VECTOR">VECTOR</button>
       </div>
     </section>
 
-    <section class="rail-block">
-      <h3 class="rail-title">Filter · Type</h3>
-      <div class="chip-row">
-        <button class="chip active" data-filter-type="MATRIX">MATRIX</button>
-        <button class="chip active" data-filter-type="VECTOR">VECTOR</button>
-      </div>
+    <section class="sb-sec">
+      <div class="sb-title">Filter · Sharpe ≥ <span id="sharpe-min-readout">−3.0</span></div>
+      <input id="sharpe-min" class="rng" type="range" min="-3" max="6" step="0.1" value="-3">
     </section>
 
-    <section class="rail-block">
-      <h3 class="rail-title">Filter · Sharpe</h3>
-      <div class="range">
-        <input id="sharpe-min" class="range-input" type="range" min="-3" max="6" step="0.1" value="-3">
-        <div class="range-readout">
-          <span class="mono" id="sharpe-min-readout">−3.0</span>
-          <span class="range-arrow">→</span>
-          <span class="mono">+6.0</span>
-        </div>
-      </div>
+    <section class="sb-sec">
+      <div class="sb-title">Edge · |corr| ≥ <span id="corr-min-readout">0.35</span></div>
+      <input id="corr-min" class="rng" type="range" min="0.10" max="0.95" step="0.01" value="0.35">
     </section>
 
-    <section class="rail-block">
-      <h3 class="rail-title">Filter · |Correlation|</h3>
-      <div class="range">
-        <input id="corr-min" class="range-input" type="range" min="0.10" max="0.95" step="0.01" value="0.35">
-        <div class="range-readout">
-          <span class="mono" id="corr-min-readout">0.35</span>
-          <span class="range-arrow">edge threshold</span>
-        </div>
-      </div>
-    </section>
-
-    <section class="rail-block rail-block-grow">
-      <h3 class="rail-title">Dataset Legend</h3>
+    <section class="sb-sec sb-sec-grow">
+      <div class="sb-title">Dataset</div>
       <ul id="dataset-legend" class="legend"></ul>
     </section>
 
-    <section class="rail-block rail-footnote">
-      <div class="footnote">
-        <div class="footnote-line"><span class="footnote-key">region</span><span class="footnote-val mono">USA · TOP3000</span></div>
-        <div class="footnote-line"><span class="footnote-key">decay · neut</span><span class="footnote-val mono">4 · SUBIND</span></div>
-        <div class="footnote-line"><span class="footnote-key">backfill · trunc</span><span class="footnote-val mono">252 · 0.08</span></div>
-        <div class="footnote-line"><span class="footnote-key">corr basis</span><span class="footnote-val mono">100% PnL</span></div>
-      </div>
-    </section>
   </aside>
 
-  <!-- ─── MAIN STAGE ──────────────────────────────────── -->
-  <main class="stage" id="stage">
-
-    <div class="stage-frame">
-      <div class="frame-corner tl"></div>
-      <div class="frame-corner tr"></div>
-      <div class="frame-corner bl"></div>
-      <div class="frame-corner br"></div>
-    </div>
-
-    <div class="stage-overline">
-      <span class="overline-mark mono" id="overline-mark">PLATE I</span>
-      <span class="overline-title">
-        <span class="display-italic">An Atlas of</span>
-        <span class="display-bold" id="overline-title">Alpha Correlation</span>
-      </span>
-      <span class="overline-mark mono" id="overline-meta">— · —</span>
-    </div>
+  <!-- ─── MAIN ────────────────────────────────────────── -->
+  <main class="stage">
 
     <!-- views -->
-    <div class="view-container" id="view-graph" data-view="graph">
-      <canvas class="view-canvas" id="graph-canvas"></canvas>
-      <div class="view-overlay" id="graph-overlay">
-        <div class="loading">
-          <div class="loading-mark">∴</div>
-          <div class="loading-text" id="loading-text">Surveying the alpha field…</div>
-          <div class="loading-bar"><div class="loading-bar-fill" id="loading-bar-fill"></div></div>
-          <div class="loading-meta mono">
-            <span id="loading-pct">0%</span>
-            <span class="loading-sep">·</span>
-            <span id="loading-stage">init</span>
-          </div>
+    <div class="vc" id="view-graph" data-view="graph">
+      <canvas class="vc-canvas" id="graph-canvas"></canvas>
+      <div class="vc-overlay" id="graph-overlay">
+        <div class="ldr">
+          <div class="ldr-pct" id="loading-pct">00%</div>
+          <div class="ldr-bar"><div class="ldr-bar-fill" id="loading-bar-fill"></div></div>
+          <div class="ldr-stage" id="loading-stage">init</div>
         </div>
       </div>
-      <div class="hud hud-graph">
-        <div class="hud-readout mono" id="graph-hud">drag · zoom · click a node</div>
-      </div>
+      <div class="hud" id="graph-hud">drag · zoom · click a node</div>
     </div>
 
-    <div class="view-container hidden" id="view-map" data-view="map">
-      <canvas class="view-canvas" id="map-canvas"></canvas>
-      <div class="hud hud-map">
-        <div class="hud-readout mono" id="map-hud">UMAP n=30 · 1 − |PnL corr|</div>
-      </div>
+    <div class="vc hidden" id="view-map" data-view="map">
+      <canvas class="vc-canvas" id="map-canvas"></canvas>
+      <div class="hud" id="map-hud">UMAP n=30 · 1 − |PnL corr|</div>
     </div>
 
-    <div class="view-container hidden" id="view-heatmap" data-view="heatmap">
-      <div class="heatmap-controls">
+    <div class="vc hidden" id="view-heatmap" data-view="heatmap">
+      <div class="vc-controls">
         <div class="seg">
-          <button class="seg-btn active" data-heatmap-mode="cluster">Cluster Means</button>
+          <button class="seg-btn on" data-heatmap-mode="cluster">Cluster Means</button>
           <button class="seg-btn" data-heatmap-mode="subset">Selected Subset</button>
         </div>
       </div>
-      <canvas class="view-canvas" id="heatmap-canvas"></canvas>
-      <div class="hud hud-heatmap">
-        <div class="hud-readout mono" id="heatmap-hud">cluster × cluster mean |r|</div>
-      </div>
+      <canvas class="vc-canvas" id="heatmap-canvas"></canvas>
+      <div class="hud" id="heatmap-hud">cluster × cluster mean |r|</div>
     </div>
 
-    <div class="view-container hidden" id="view-groups" data-view="groups">
-      <div class="groups-controls">
-        <span class="groups-label">Threshold</span>
-        <div class="seg">
-          <button class="seg-btn" data-thr="0.10">≥ 0.10</button>
-          <button class="seg-btn" data-thr="0.25">≥ 0.25</button>
-          <button class="seg-btn active" data-thr="0.35">≥ 0.35</button>
-          <button class="seg-btn" data-thr="0.50">≥ 0.50</button>
+    <div class="vc hidden" id="view-groups" data-view="groups">
+      <div class="vc-controls vc-controls-groups">
+        <div class="gctl">
+          <span class="gctl-label">THRESHOLD</span>
+          <div class="seg">
+            <button class="seg-btn" data-thr="0.10">≥ 0.10</button>
+            <button class="seg-btn" data-thr="0.25">≥ 0.25</button>
+            <button class="seg-btn on" data-thr="0.35">≥ 0.35</button>
+            <button class="seg-btn" data-thr="0.50">≥ 0.50</button>
+          </div>
         </div>
-        <span class="groups-label">Export</span>
-        <div class="seg">
-          <button class="seg-btn" data-topn="5">Top 5</button>
-          <button class="seg-btn active" data-topn="10">Top 10</button>
-          <button class="seg-btn" data-topn="20">Top 20</button>
-          <button class="seg-btn" data-topn="all">All</button>
+        <div class="gctl">
+          <span class="gctl-label">EXPORT</span>
+          <div class="seg">
+            <button class="seg-btn" data-topn="5">Top 5</button>
+            <button class="seg-btn on" data-topn="10">Top 10</button>
+            <button class="seg-btn" data-topn="20">Top 20</button>
+            <button class="seg-btn" data-topn="all">All</button>
+          </div>
+          <button class="btn-yellow" id="export-csv-btn">
+            <span class="btn-arrow">↓</span> EXPORT CSV
+          </button>
         </div>
-        <button class="export-btn" id="export-csv-btn" title="Download representative fields per group as CSV">
-          <span class="export-arrow">↓</span>
-          <span class="export-label">CSV</span>
-        </button>
       </div>
-      <div class="groups-grid" id="groups-grid"></div>
+      <div class="grid-cards" id="groups-grid"></div>
     </div>
 
   </main>
 
-  <!-- ─── DETAIL PANEL (slide-in) ─────────────────────── -->
-  <aside class="detail" id="detail" aria-hidden="true">
-    <div class="detail-inner">
-      <button class="detail-close" id="detail-close" aria-label="Close detail">×</button>
+  <!-- ─── FOOTER ──────────────────────────────────────── -->
+  <footer class="ftr">
+    <span class="ftr-item"><em>basis</em> PnL Pearson, demeaned</span>
+    <span class="ftr-sep">/</span>
+    <span class="ftr-item"><em>backfill</em> 252</span>
+    <span class="ftr-sep">/</span>
+    <span class="ftr-item"><em>universe</em> USA TOP3000 d=1</span>
+    <span class="ftr-spacer"></span>
+    <span class="ftr-item ftr-hint">/ to focus search · ⌘K · ESC to close</span>
+  </footer>
 
-      <div class="detail-overline mono">
-        <span id="detail-num">·</span>
-        <span class="detail-sep">/</span>
-        <span id="detail-total">·</span>
-      </div>
+  <!-- ─── DETAIL PANEL ────────────────────────────────── -->
+  <aside class="dt" id="detail" aria-hidden="true">
+    <button class="dt-close" id="detail-close" aria-label="Close">×</button>
 
-      <h2 class="detail-title">
-        <span class="detail-title-text mono" id="detail-id">—</span>
-      </h2>
+    <div class="dt-overline">
+      <span id="detail-num">—</span><span class="dt-sep">/</span><span id="detail-total">—</span>
+    </div>
 
-      <div class="detail-badges">
-        <span class="badge" id="detail-type">—</span>
-        <span class="badge" id="detail-dataset">—</span>
-        <span class="badge" id="detail-reducer">—</span>
-      </div>
+    <h2 class="dt-title" id="detail-id">—</h2>
 
-      <p class="detail-desc" id="detail-desc">—</p>
+    <div class="dt-badges">
+      <span class="badge" id="detail-type">—</span>
+      <span class="badge" id="detail-dataset">—</span>
+      <span class="badge" id="detail-reducer">—</span>
+    </div>
 
-      <div class="detail-section">
-        <div class="detail-section-title">Realized Performance · IS</div>
-        <div class="metric-grid">
-          <div class="metric">
-            <div class="metric-key">Sharpe</div>
-            <div class="metric-val mono" id="metric-sharpe">—</div>
-          </div>
-          <div class="metric">
-            <div class="metric-key">Fitness</div>
-            <div class="metric-val mono" id="metric-fitness">—</div>
-          </div>
-          <div class="metric">
-            <div class="metric-key">Turnover</div>
-            <div class="metric-val mono" id="metric-turnover">—</div>
-          </div>
-          <div class="metric">
-            <div class="metric-key">Returns</div>
-            <div class="metric-val mono" id="metric-returns">—</div>
-          </div>
-          <div class="metric">
-            <div class="metric-key">Drawdown</div>
-            <div class="metric-val mono" id="metric-drawdown">—</div>
-          </div>
-          <div class="metric">
-            <div class="metric-key">Long / Short</div>
-            <div class="metric-val mono" id="metric-ls">—</div>
-          </div>
-        </div>
-      </div>
+    <p class="dt-desc" id="detail-desc">—</p>
 
-      <div class="detail-section">
-        <div class="detail-section-title">Cumulative PnL</div>
-        <div class="chart-wrap">
-          <canvas id="pnl-chart"></canvas>
-          <div class="chart-empty" id="pnl-empty">No PnL data</div>
-        </div>
-      </div>
-
-      <div class="detail-section">
-        <div class="detail-section-title">Expression</div>
-        <pre class="code-block mono" id="detail-expr">—</pre>
-        <div class="detail-meta">
-          <span class="meta-key">alpha_id</span>
-          <span class="meta-val mono" id="detail-alpha-id">—</span>
-        </div>
-      </div>
-
-      <div class="detail-section">
-        <div class="detail-section-title">
-          Constellation
-          <span class="detail-section-sub">— top neighbors by |corr|</span>
-        </div>
-        <ul class="neighbor-list" id="neighbor-list"></ul>
+    <div class="dt-section">
+      <div class="dt-section-title">Performance · IS</div>
+      <div class="metrics">
+        <div class="m-row"><span class="m-key">Sharpe</span><span class="m-val" id="metric-sharpe">—</span></div>
+        <div class="m-row"><span class="m-key">Fitness</span><span class="m-val" id="metric-fitness">—</span></div>
+        <div class="m-row"><span class="m-key">Turnover</span><span class="m-val" id="metric-turnover">—</span></div>
+        <div class="m-row"><span class="m-key">Returns</span><span class="m-val" id="metric-returns">—</span></div>
+        <div class="m-row"><span class="m-key">Drawdown</span><span class="m-val" id="metric-drawdown">—</span></div>
+        <div class="m-row"><span class="m-key">Long / Short</span><span class="m-val" id="metric-ls">—</span></div>
       </div>
     </div>
-  </aside>
 
-  <!-- ─── STATUS BAR ──────────────────────────────────── -->
-  <footer class="status">
-    <span class="status-item mono"><span class="status-key">basis</span> PnL Pearson, demeaned</span>
-    <span class="status-item mono"><span class="status-key">window</span> backfill=252</span>
-    <span class="status-item mono"><span class="status-key">universe</span> USA TOP3000 d=1</span>
-    <span class="status-item status-spacer"></span>
-    <span class="status-item mono" id="status-tip">hover · click · drag · ⌘K</span>
-  </footer>
+    <div class="dt-section">
+      <div class="dt-section-title">Cumulative PnL</div>
+      <div class="chart-wrap">
+        <canvas id="pnl-chart"></canvas>
+        <div class="chart-empty" id="pnl-empty">no pnl data</div>
+      </div>
+    </div>
+
+    <div class="dt-section">
+      <div class="dt-section-title">Expression</div>
+      <pre class="code" id="detail-expr">—</pre>
+      <div class="dt-meta-row"><em>alpha_id</em><span id="detail-alpha-id">—</span></div>
+    </div>
+
+    <div class="dt-section">
+      <div class="dt-section-title">Top Neighbors · |corr|</div>
+      <ul class="nb-list" id="neighbor-list"></ul>
+    </div>
+  </aside>
 
 </div>
 

@@ -1,54 +1,65 @@
-/* IQC ATLAS — Main controller
-   Boot order:
-     1. load all assets/data/*.json
-     2. populate stats + dataset legend + filter handlers
-     3. initialize each view lazily on tab switch
-*/
+/* IQC · FIELD ATLAS — Main controller (terminal aesthetic) */
 (function () {
   const Atlas = (window.Atlas = window.Atlas || {});
 
-  const PLATE_TITLES = {
-    graph:   { mark: "PLATE I",   meta: "Network",   title: "Alpha Correlation" },
-    map:     { mark: "PLATE II",  meta: "UMAP",      title: "Embedding Space" },
-    heatmap: { mark: "PLATE III", meta: "Matrix",    title: "Cluster Correlation" },
-    groups:  { mark: "PLATE IV",  meta: "Clusters",  title: "Constellations" },
+  /* --- desaturated dark-friendly 17-color palette --- */
+  /* Override whatever colors live in datasets.json with these terminal-safe tones. */
+  const PALETTE = {
+    analyst4:      "#6b8a90",
+    fundamental2:  "#7d8a6b",
+    fundamental6:  "#9b6b54",
+    model16:       "#a8895c",
+    model51:       "#6b7990",
+    model53:       "#8a6b8a",
+    model77:       "#94855e",
+    news12:        "#5e8a7d",
+    news18:        "#9b7d7d",
+    option8:       "#7a8a9b",
+    option9:       "#98896b",
+    pv1:           "#aa7a5e",
+    pv13:          "#6b8a6b",
+    sentiment1:    "#9b7a85",
+    socialmedia12: "#888a6b",
+    socialmedia8:  "#6b8a98",
+    univ1:         "#888888",
   };
+  const PALETTE_DEFAULT = "#888888";
+  Atlas.palette = (id) => PALETTE[id] || PALETTE_DEFAULT;
 
   const viewInits = {};
-  let currentView = "graph";
 
   function setView(v) {
-    currentView = v;
-    document.querySelectorAll(".view-container").forEach((c) => {
+    document.querySelectorAll(".vc").forEach((c) => {
       c.classList.toggle("hidden", c.dataset.view !== v);
     });
-    document.querySelectorAll(".tab").forEach((t) => {
-      t.classList.toggle("active", t.dataset.view === v);
+    document.querySelectorAll(".vl-row").forEach((row) => {
+      row.classList.toggle("active", row.dataset.view === v);
     });
-    const meta = PLATE_TITLES[v] || {};
-    document.getElementById("overline-mark").textContent = meta.mark || "—";
-    document.getElementById("overline-title").textContent = meta.title || "—";
-    document.getElementById("overline-meta").textContent = meta.meta || "—";
 
+    const target = Atlas[v];
     if (!viewInits[v]) {
       viewInits[v] = true;
-      if (Atlas[v] && Atlas[v].init) Atlas[v].init();
+      if (target && target.init) target.init();
     } else {
-      if (Atlas[v] && Atlas[v].redraw) Atlas[v].redraw();
+      if (target && target.redraw) target.redraw();
     }
   }
 
-  function setupStatsAndLegend(data) {
-    const { nodes, datasets } = data;
-    document.querySelector('[data-stat="n_fields"]').textContent = nodes.length.toLocaleString();
+  function setupHeaderStats(data) {
+    document.querySelector('[data-stat="n_fields"]').textContent =
+      data.nodes.length.toLocaleString();
     document.querySelector('[data-stat="n_sim"]').textContent =
-      nodes.filter((n) => n.alpha_id).length.toLocaleString();
+      data.nodes.filter((n) => n.alpha_id).length.toLocaleString();
     document.querySelector('[data-stat="n_clusters"]').textContent =
       (data.groups && data.groups.cluster_heatmap && data.groups.cluster_heatmap.labels.length) || "—";
+  }
 
+  function setupLegend(data) {
     const legend = document.getElementById("dataset-legend");
     legend.innerHTML = "";
-    const sorted = [...datasets].sort((a, b) => b.count - a.count);
+    // override colors with terminal palette
+    data.datasets.forEach((d) => { d.color = Atlas.palette(d.id); });
+    const sorted = [...data.datasets].sort((a, b) => b.count - a.count);
     for (const d of sorted) {
       const li = document.createElement("li");
       li.className = "legend-row";
@@ -56,12 +67,12 @@
       li.dataset.active = "1";
       li.innerHTML = `
         <span class="legend-swatch" style="background:${d.color}"></span>
-        <span class="legend-name">${d.name}</span>
-        <span class="legend-count">${d.count}</span>
+        <span class="legend-name">${d.id}</span>
+        <span class="legend-count">${d.count.toLocaleString()}</span>
       `;
       li.addEventListener("click", () => {
-        const wasActive = li.dataset.active === "1";
-        li.dataset.active = wasActive ? "0" : "1";
+        const on = li.dataset.active === "1";
+        li.dataset.active = on ? "0" : "1";
         Atlas.search.toggleDataset(d.id);
         broadcastFilters();
       });
@@ -69,27 +80,35 @@
     }
   }
 
+  function setupViewList() {
+    document.querySelectorAll(".vl-row").forEach((row) => {
+      row.addEventListener("click", () => setView(row.dataset.view));
+    });
+  }
+
   function setupFilters() {
     document.querySelectorAll('[data-filter-type]').forEach((b) => {
       b.addEventListener("click", () => {
         const t = b.dataset.filterType;
-        const on = b.classList.toggle("active");
+        const on = b.classList.toggle("on");
         Atlas.search.setType(t, on);
         broadcastFilters();
       });
     });
+
     const sharpe = document.getElementById("sharpe-min");
     const sharpeRO = document.getElementById("sharpe-min-readout");
     sharpe.addEventListener("input", () => {
       Atlas.search.setSharpeMin(sharpe.value);
-      sharpeRO.textContent = Number(sharpe.value).toFixed(1).replace("-", "−");
+      sharpeRO.textContent = (+sharpe.value).toFixed(1).replace("-", "−");
       broadcastFilters();
     });
+
     const corr = document.getElementById("corr-min");
     const corrRO = document.getElementById("corr-min-readout");
     corr.addEventListener("input", () => {
       Atlas.search.setCorrMin(corr.value);
-      corrRO.textContent = Number(corr.value).toFixed(2);
+      corrRO.textContent = (+corr.value).toFixed(2);
       if (Atlas.graph && Atlas.graph.rebuildEdges) {
         Atlas.graph.rebuildEdges(+corr.value);
       }
@@ -112,11 +131,11 @@
       results.innerHTML = "";
       current.forEach((r, i) => {
         const div = document.createElement("div");
-        div.className = "search-result" + (i === focused ? " focused" : "");
+        div.className = "sr-result" + (i === focused ? " focused" : "");
         div.innerHTML = `
-          <span class="search-result-id">${r.id}</span>
-          <span class="search-result-meta">${r.dataset || ""} · sharpe ${Number(r.sharpe || 0).toFixed(2)}</span>
-          <span class="search-result-desc">${(r.desc || "").slice(0, 120)}</span>
+          <span class="sr-result-id">${r.id}</span>
+          <span class="sr-result-meta">${r.dataset || ""} · ${(+r.sharpe || 0).toFixed(2)}</span>
+          <span class="sr-result-desc">${(r.desc || "").slice(0, 120)}</span>
         `;
         div.addEventListener("mousedown", (e) => {
           e.preventDefault();
@@ -135,27 +154,40 @@
       render();
     });
     input.addEventListener("focus", () => { if (current.length) results.classList.add("open"); });
-    input.addEventListener("blur", () => { setTimeout(() => results.classList.remove("open"), 120); });
+    input.addEventListener("blur", () => { setTimeout(() => results.classList.remove("open"), 130); });
     input.addEventListener("keydown", (e) => {
-      if (e.key === "ArrowDown") { focused = Math.min(current.length - 1, focused + 1); render(); e.preventDefault(); }
-      else if (e.key === "ArrowUp") { focused = Math.max(0, focused - 1); render(); e.preventDefault(); }
-      else if (e.key === "Enter" && focused >= 0) {
+      if (e.key === "ArrowDown") {
+        focused = Math.min(current.length - 1, focused + 1); render(); e.preventDefault();
+        scrollFocused(results);
+      } else if (e.key === "ArrowUp") {
+        focused = Math.max(0, focused - 1); render(); e.preventDefault();
+        scrollFocused(results);
+      } else if (e.key === "Enter" && focused >= 0) {
         Atlas.detail.open(current[focused].id);
         results.classList.remove("open");
         e.preventDefault();
-      } else if (e.key === "Escape") { results.classList.remove("open"); input.blur(); }
+      } else if (e.key === "Escape") {
+        results.classList.remove("open");
+        input.blur();
+      }
     });
 
     window.addEventListener("keydown", (e) => {
-      if (e.key === "/" && document.activeElement !== input) { e.preventDefault(); input.focus(); }
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") { e.preventDefault(); input.focus(); }
+      if (e.key === "/" && document.activeElement !== input) {
+        e.preventDefault(); input.focus();
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault(); input.focus();
+      }
+      if (e.key === "Escape") {
+        Atlas.detail && Atlas.detail.close && Atlas.detail.close();
+      }
     });
   }
 
-  function setupTabs() {
-    document.querySelectorAll(".tab").forEach((t) => {
-      t.addEventListener("click", () => setView(t.dataset.view));
-    });
+  function scrollFocused(parent) {
+    const f = parent.querySelector(".sr-result.focused");
+    if (f) f.scrollIntoView({ block: "nearest" });
   }
 
   async function boot() {
@@ -164,18 +196,16 @@
       data = await Atlas.data.load();
     } catch (err) {
       console.error(err);
-      document.getElementById("graph-overlay").innerHTML = `
-        <div class="loading">
-          <div class="loading-mark" style="color: var(--rust)">!</div>
-          <div class="loading-text">Atlas data not yet generated. Run the pipeline first.</div>
-        </div>`;
+      const el = document.getElementById("loading-stage");
+      if (el) { el.textContent = "data load failed"; el.style.color = "var(--neg)"; }
       return;
     }
     Atlas.search.init(data.nodes);
-    setupStatsAndLegend(data);
+    setupHeaderStats(data);
+    setupLegend(data);
+    setupViewList();
     setupFilters();
     setupSearch();
-    setupTabs();
     Atlas.detail.init();
     setView("graph");
   }
