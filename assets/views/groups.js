@@ -43,13 +43,9 @@
         <div class="gcard-fields">${fieldsHTML}</div>
       `;
       card.addEventListener("click", () => {
-        // open detail for top-fitness member of this cluster
-        const cid = parseInt(String(g.id).replace(/^C/i, ""), 10);
-        const members = (Atlas.data.get().nodes || [])
-          .filter((n) => n.cluster === cid)
-          .sort((a, b) => (b.fitness ?? -1e18) - (a.fitness ?? -1e18));
-        const target = members[0] || { id: (g.sample_fields || [])[0] };
-        if (target && target.id) Atlas.detail.open(target.id);
+        // members is already pre-sorted by fitness desc in groups.json
+        const target = (g.members && g.members[0]) || (g.sample_fields && g.sample_fields[0]);
+        if (target) Atlas.detail.open(target);
       });
       grid.appendChild(card);
     }
@@ -71,23 +67,19 @@
     if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
     return s;
   }
-  function membersOfCluster(cid, nodes) {
-    return nodes.filter((n) => n.cluster === cid)
-      .sort((a, b) => (b.fitness ?? -Infinity) - (a.fitness ?? -Infinity));
-  }
   function buildCSV() {
-    const { nodes, groups } = Atlas.data.get();
+    const { groups } = Atlas.data.get();
     const cards = (groups && groups.by_threshold && groups.by_threshold[thr]) || [];
     const limit = topN === "all" ? Infinity : parseInt(topN, 10);
     const lines = [COLS.join(",")];
     for (const g of cards) {
-      const cid = parseInt(String(g.id).replace(/^C/i, ""), 10);
-      if (!Number.isFinite(cid)) continue;
-      const members = membersOfCluster(cid, nodes).slice(0, limit);
-      members.forEach((m, i) => {
+      // g.members is full list pre-sorted by fitness desc (Agglomerative partition)
+      const memberIds = (g.members || []).slice(0, limit);
+      memberIds.forEach((fid, i) => {
+        const m = Atlas.data.byId(fid) || {};
         const row = [
           thr, g.id, g.n, g.top_dataset || "",
-          i + 1, m.id,
+          i + 1, fid,
           (m.fitness ?? "").toString(),
           (m.sharpe ?? "").toString(),
           (m.turnover ?? "").toString(),
